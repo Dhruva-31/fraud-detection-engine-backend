@@ -18,7 +18,7 @@ const register = async (req, res) => {
 
   } catch (error) {
     console.error("Register error:\n", error);
-    res.status(error.statusCode).json({ message: error.message});
+    res.status(error.statusCode || 500).json({ message: error.message});
   }
 };
 
@@ -40,7 +40,7 @@ const login = async (req, res) => {
 
   } catch (error) {
     console.error("Login error:\n", error);
-    res.status(error.statusCode).json({ message: error.message});
+    res.status(error.statusCode || 500).json({ message: error.message});
   }
 };
 
@@ -52,7 +52,7 @@ const getMe = async (req, res) => {
 
   } catch (error) {
     console.error("GetMe error:\n", error);
-    res.status(error.statusCode).json({ message: error.message});
+    res.status(error.statusCode || 500).json({ message: error.message});
   }
 };
 

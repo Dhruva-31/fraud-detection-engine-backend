@@ -12,8 +12,8 @@ const getAllAlerts = async (req, res) => {
       alerts
     });
   } catch (error) {
-    console.error("Alerts retrievel error:\n", error);
-    res.status(error.statusCode).json({ message: error.message});
+    console.error("Alerts retrieval error:\n", error);
+    res.status(error.statusCode || 500).json({ message: error.message});
   }
 }
 
@@ -27,8 +27,8 @@ const getAlertsById = async (req, res) => {
       alert
     });
   } catch (error) {
-    console.error("Alert by id retrievel error:\n", error);
-    res.status(error.statusCode).json({ message: error.message});
+    console.error("Alert by id retrieval error:\n", error);
+    res.status(error.statusCode || 500).json({ message: error.message});
   }
 }
 
@@ -36,15 +36,14 @@ const reviewAlert = async (req, res) => {
   try {
     const id = req.params.id
     const userId = req.user.userId
-    const data = req.body
-    const alert = await reviewAlertService(id, userId, data)
+    const alert = await reviewAlertService(id, userId)
     res.status(200).json({
       message: "Alert reviewed successfully",
       alert
     });
   } catch (error) {
-    console.error("Alert review retrievel error:\n", error);
-    res.status(error.statusCode).json({ message: error.message});
+    console.error("Alert review retrieval error:\n", error);
+    res.status(error.statusCode || 500).json({ message: error.message});
   }
 }
 

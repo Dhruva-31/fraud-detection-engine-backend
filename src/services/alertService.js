@@ -1,10 +1,9 @@
 const prisma = require("../config/prisma");
 const AppError = require("../utils/AppError");
-const { getTransactionsService } = require("./transactionService");
 
 const getAllAlertsService = async (userId, query) => {
   const where = {
-    transaction: { userId }
+    transaction: { is: { userId } }
   };
 
   if (query.reviewed !== undefined) {
@@ -25,7 +24,7 @@ const getAllAlertsService = async (userId, query) => {
 }
 
 const getAlertsByIdService = async (id, userId) => {
-  const alert = await prisma.fraudAlert.findFirst({
+  const alert = await prisma.fraudAlert.findUnique({
     where: {
       id
     },
@@ -45,7 +44,7 @@ const getAlertsByIdService = async (id, userId) => {
   return alert;
 }
 
-const reviewAlertService = async (id, userId, data) => {
+const reviewAlertService = async (id, userId) => {
   const alert = await prisma.fraudAlert.findUnique({
     where: { id },
     include: { transaction: true }
@@ -63,17 +62,23 @@ const reviewAlertService = async (id, userId, data) => {
     throw new AppError("Alert already reviewed", 400);
   }
 
-  const [reviewedAlert] = await prisma.$transaction([
+  await prisma.$transaction([
     prisma.fraudAlert.update({
       where: { id },
       data: { reviewed: true },  
-      include: { transaction: true }
     }),
     prisma.transaction.update({
       where: { id: alert.transactionId },
       data: { status: "CLEAN" }
-    })
+    }),
   ]);
+
+  const reviewedAlert = await prisma.fraudAlert.findUnique({
+    where: { id },
+    include: {
+      transaction: true
+    }
+  });
 
   return reviewedAlert;
 }
