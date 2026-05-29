@@ -80,13 +80,13 @@ const loginService = async (email, password) => {
 
 const getMeService = async (id) => {
   const user = await prisma.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        createdAt: true
-      }
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      createdAt: true
+    }
   });
   return user;
 }

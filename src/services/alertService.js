@@ -59,26 +59,20 @@ const reviewAlertService = async (id, userId) => {
   }
 
   if (alert.reviewed) {
-    throw new AppError("Alert already reviewed", 400);
+    return alert;
   }
 
-  await prisma.$transaction([
-    prisma.fraudAlert.update({
-      where: { id },
-      data: { reviewed: true },  
-    }),
+  const reviewedAlert = await prisma.$transaction([
     prisma.transaction.update({
       where: { id: alert.transactionId },
       data: { status: "CLEAN" }
     }),
+    prisma.fraudAlert.update({
+      where: { id },
+      data: { reviewed: true },  
+    })
   ]);
 
-  const reviewedAlert = await prisma.fraudAlert.findUnique({
-    where: { id },
-    include: {
-      transaction: true
-    }
-  });
 
   return reviewedAlert;
 }

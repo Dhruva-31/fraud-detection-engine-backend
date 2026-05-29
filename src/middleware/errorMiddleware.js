@@ -51,7 +51,11 @@ const sendError = (err, res) => {
   }
 
   // Programming or unknown errors — don't leak details
-  console.error("UNEXPECTED ERROR:", err);
+  logger.error("UNEXPECTED ERROR", {
+    message: err.message,
+    stack: err.stack
+  });
+  
   return res.status(500).json({
     status: "error",
     message: "Something went wrong. Please try again later.",
