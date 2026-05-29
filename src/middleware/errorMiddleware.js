@@ -1,3 +1,4 @@
+const logger = require("../config/logger");
 const AppError = require("../utils/AppError");
 
 // ─── Handle specific Prisma errors ───────────────────────────
