@@ -96,14 +96,13 @@ const getTransactionByIdService = async (id, userId) => {
       fraudAlert: true  
     }
   });
-  console.log(transaction)
 
   if (!transaction) {
     throw new AppError("Transaction not found", 404);
   }
 
   if (transaction.userId !== userId) {
-    throw new AppError("Unauthorized", 403);
+    throw new AppError("Forbidden", 403);
   }
 
   return transaction

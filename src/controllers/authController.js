@@ -1,6 +1,5 @@
 const { registerService, loginService, getMeService } = require("../services/authService")
 
-// ─── Register ────────────────────────────────────────────────
 const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -23,7 +22,6 @@ const register = async (req, res) => {
   }
 };
 
-// ─── Login ───────────────────────────────────────────────────
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -46,7 +44,6 @@ const login = async (req, res) => {
   }
 };
 
-// ─── Get current user (protected route) ──────────────────────
 const getMe = async (req, res) => {
   try {
     const user = await getMeService(req.user.userId);
