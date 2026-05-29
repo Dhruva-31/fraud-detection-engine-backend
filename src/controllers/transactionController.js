@@ -14,7 +14,7 @@ const saveTransaction = async (req, res) => {
     
   } catch (error) {
     console.error("Save Transaction error:\n", error);
-    res.status(error.statusCode).json({ message: error.message});
+    res.status(error.statusCode || 500).json({ message: error.message});
   }
 }
 
@@ -32,7 +32,7 @@ const getTransactions = async (req, res) => {
     
   } catch (error) {
     console.error("Get Transaction error:\n", error);
-    res.status(error.statusCode).json({ message: error.message});
+    res.status(error.statusCode || 500).json({ message: error.message});
   }
 }
 
@@ -52,7 +52,7 @@ const getTransactionById = async (req, res) => {
     
   } catch (error) {
     console.error("Get Transaction error:\n", error);
-    res.status(error.statusCode).json({ message: error.message});
+    res.status(error.statusCode || 500).json({ message: error.message});
   }
 }
 

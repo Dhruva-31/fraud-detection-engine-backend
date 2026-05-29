@@ -1,6 +1,5 @@
 const { registerService, loginService, getMeService } = require("../services/authService")
 
-// ─── Register ────────────────────────────────────────────────
 const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -19,11 +18,10 @@ const register = async (req, res) => {
 
   } catch (error) {
     console.error("Register error:\n", error);
-    res.status(error.statusCode).json({ message: error.message});
+    res.status(error.statusCode || 500).json({ message: error.message});
   }
 };
 
-// ─── Login ───────────────────────────────────────────────────
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -42,11 +40,10 @@ const login = async (req, res) => {
 
   } catch (error) {
     console.error("Login error:\n", error);
-    res.status(error.statusCode).json({ message: error.message});
+    res.status(error.statusCode || 500).json({ message: error.message});
   }
 };
 
-// ─── Get current user (protected route) ──────────────────────
 const getMe = async (req, res) => {
   try {
     const user = await getMeService(req.user.userId);
@@ -55,7 +52,7 @@ const getMe = async (req, res) => {
 
   } catch (error) {
     console.error("GetMe error:\n", error);
-    res.status(error.statusCode).json({ message: error.message});
+    res.status(error.statusCode || 500).json({ message: error.message});
   }
 };
 

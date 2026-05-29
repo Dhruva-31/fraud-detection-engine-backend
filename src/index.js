@@ -8,6 +8,7 @@ const { globalErrorHandler, notFoundHandler } = require("./middleware/errorMiddl
 
 const authRoutes = require("./routes/authRoute");
 const transactionRoutes = require("./routes/transactionRoute");
+const alertRoutes = require("./routes/alertRoute");
 
 const app = express();
 const server = http.createServer(app);
@@ -29,6 +30,7 @@ app.set("io", io);
 // Routes
 app.use(authRoutes);
 app.use(transactionRoutes);
+app.use(alertRoutes);
 
 app.use(notFoundHandler);
 app.use(globalErrorHandler);
