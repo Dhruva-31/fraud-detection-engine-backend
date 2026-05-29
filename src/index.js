@@ -9,6 +9,8 @@ const { globalErrorHandler, notFoundHandler } = require("./middleware/errorMiddl
 const authRoutes = require("./routes/authRoute");
 const transactionRoutes = require("./routes/transactionRoute");
 const alertRoutes = require("./routes/alertRoute");
+const requestLogger = require("./middleware/requestLoggerMiddleware");
+const logger = require("./config/logger");
 
 const app = express();
 const server = http.createServer(app);
@@ -24,6 +26,8 @@ const io = new Server(server, {
 app.use(cors({ origin: "http://localhost:3000" }));
 app.use(express.json());
 
+app.use(requestLogger);
+
 // Make io accessible in routes later
 app.set("io", io);
 
@@ -37,16 +41,15 @@ app.use(globalErrorHandler);
 
 // Socket connection
 io.on("connection", (socket) => {
-  console.log("Client connected:", socket.id);
+  logger.info(`Client connected: ${socket.id}`);
   socket.on("disconnect", () => {
-    console.log("Client disconnected:", socket.id);
+    logger.info(`Client disconnected: ${socket.id}`);
   });
 });
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`Server running on port ${PORT}`);
 });
 
 app.get('/', (req, res) => {

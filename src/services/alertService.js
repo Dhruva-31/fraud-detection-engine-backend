@@ -1,3 +1,4 @@
+const logger = require("../config/logger");
 const prisma = require("../config/prisma");
 const AppError = require("../utils/AppError");
 
@@ -63,21 +64,19 @@ const reviewAlertService = async (id, userId) => {
   }
 
   await prisma.$transaction([
-    prisma.fraudAlert.update({
-      where: { id },
-      data: { reviewed: true },  
-    }),
     prisma.transaction.update({
       where: { id: alert.transactionId },
       data: { status: "CLEAN" }
     }),
+    prisma.fraudAlert.update({
+      where: { id },
+      data: { reviewed: true }
+    })
   ]);
 
   const reviewedAlert = await prisma.fraudAlert.findUnique({
     where: { id },
-    include: {
-      transaction: true
-    }
+    include: { transaction: true }
   });
 
   return reviewedAlert;
