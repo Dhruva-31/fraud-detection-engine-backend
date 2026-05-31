@@ -9,6 +9,8 @@ const { globalErrorHandler, notFoundHandler } = require("./middleware/errorMiddl
 const authRoutes = require("./routes/authRoute");
 const transactionRoutes = require("./routes/transactionRoute");
 const alertRoutes = require("./routes/alertRoute");
+const analyticsRoutes = require("./routes/analyticsRoute");
+
 const requestLogger = require("./middleware/requestLoggerMiddleware");
 const logger = require("./config/logger");
 
@@ -35,6 +37,7 @@ app.set("io", io);
 app.use(authRoutes);
 app.use(transactionRoutes);
 app.use(alertRoutes);
+app.use(analyticsRoutes);
 
 app.use(notFoundHandler);
 app.use(globalErrorHandler);
@@ -48,7 +51,7 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
 });
 
