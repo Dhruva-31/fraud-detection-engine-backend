@@ -6,11 +6,12 @@ const {
 
 const saveTransaction = async (req, res) => {
   const userId = req.user.userId;
+  const io = req.app.get("io");
 
   const { transaction, fraudResult } = await saveTransactionService({
     ...req.body,
-    userId,
-  });
+    userId
+  }, io);
 
   res.status(201).json({
     message: "Transaction saved successfully",

@@ -2,16 +2,26 @@ const prisma = require("../config/prisma");
 const AppError = require("../utils/AppError");
 const { runFraudEngine } = require("../utils/fraudEngine");
 
-const saveTransactionService = async (transactionData) => {
+const saveTransactionService = async (transactionData, io) => {
   const { userId, amount, merchant, category, location } = transactionData;
-  if (!amount || !merchant || !category || !location)  {
-    throw new AppError("amount, merchant, category and location are required", 400);
+  if (!amount || !merchant || !category || !location) {
+    throw new AppError(
+      "amount, merchant, category and location are required",
+      400,
+    );
   }
 
   const fraudResult = await runFraudEngine(transactionData);
 
   const transaction = await prisma.transaction.create({
-    data: { amount, merchant, category, location, userId, status: fraudResult.status},
+    data: {
+      amount,
+      merchant,
+      category,
+      location,
+      userId,
+      status: fraudResult.status,
+    },
     select: {
       id: true,
       userId: true,
@@ -19,8 +29,8 @@ const saveTransactionService = async (transactionData) => {
       merchant: true,
       category: true,
       location: true,
-      status: true
-    }
+      status: true,
+    },
   });
 
   if (fraudResult.status === "FLAGGED" || fraudResult.status === "REVIEW") {
@@ -28,28 +38,38 @@ const saveTransactionService = async (transactionData) => {
       data: {
         transactionId: transaction.id,
         riskScore: fraudResult.riskScore,
-        triggeredRules: fraudResult.triggeredRules.join(",")
-      }
+        triggeredRules: fraudResult.triggeredRules.join(","),
+      },
     });
+
+    if (io && fraudResult.status === "FLAGGED") {
+      io.emit("fraud_alert", {
+        transactionId: transaction.id,
+        amount: transaction.amount,
+        merchant: transaction.merchant,
+        riskScore: fraudResult.riskScore,
+        triggeredRules: fraudResult.triggeredRules,
+      });
+    }
   }
 
   await updateBehaviorProfile(userId, { amount, category, location });
 
-  return { transaction, fraudResult }
-}
+  return { transaction, fraudResult };
+};
 
 const updateBehaviorProfile = async (userId, transaction) => {
   const { amount, category, location } = transaction;
 
   // Step 1 — get current profile
   const profile = await prisma.userBehaviorProfile.findUnique({
-    where: { userId }
+    where: { userId },
   });
 
   // Step 2 — recalculate average transaction amount
   const avgResult = await prisma.transaction.aggregate({
     where: { userId },
-    _avg: { amount: true }
+    _avg: { amount: true },
   });
 
   const newAvg = avgResult._avg.amount || amount;
@@ -73,28 +93,28 @@ const updateBehaviorProfile = async (userId, transaction) => {
     data: {
       avgTransactionAmount: newAvg,
       commonCategories: updatedCategories,
-      lastKnownLocation: location
-    }
+      lastKnownLocation: location,
+    },
   });
 };
 
 const getTransactionsService = async (userId) => {
   const transactions = await prisma.transaction.findMany({
     where: {
-      userId
+      userId,
     },
-    orderBy: { timestamp: "desc" }
+    orderBy: { timestamp: "desc" },
   });
 
-  return transactions
-}
+  return transactions;
+};
 
 const getTransactionByIdService = async (id, userId) => {
   const transaction = await prisma.transaction.findUnique({
     where: { id },
     include: {
-      fraudAlert: true  
-    }
+      fraudAlert: true,
+    },
   });
 
   if (!transaction) {
@@ -105,11 +125,11 @@ const getTransactionByIdService = async (id, userId) => {
     throw new AppError("Forbidden", 403);
   }
 
-  return transaction
-}
+  return transaction;
+};
 
 module.exports = {
   saveTransactionService,
   getTransactionsService,
-  getTransactionByIdService
-}
+  getTransactionByIdService,
+};
