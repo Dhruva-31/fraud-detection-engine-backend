@@ -21,6 +21,8 @@ const saveTransactionService = async (transactionData, io) => {
       location,
       userId,
       status: fraudResult.status,
+      riskScore: fraudResult.riskScore,
+      triggeredRules: fraudResult.triggeredRules,
     },
     select: {
       id: true,
@@ -30,6 +32,8 @@ const saveTransactionService = async (transactionData, io) => {
       category: true,
       location: true,
       status: true,
+      riskScore: true,
+      triggeredRules: true,
     },
   });
 
@@ -37,16 +41,13 @@ const saveTransactionService = async (transactionData, io) => {
     await prisma.fraudAlert.create({
       data: {
         transactionId: transaction.id,
-        riskScore: fraudResult.riskScore,
-        triggeredRules: fraudResult.triggeredRules.join(","),
       },
     });
 
     if (io && fraudResult.status === "FLAGGED") {
-      io.emit("fraud_alert", {
+      io.to(`user_${userId}`).emit("fraud_alert", {
         transactionId: transaction.id,
         amount: transaction.amount,
-        merchant: transaction.merchant,
         riskScore: fraudResult.riskScore,
         triggeredRules: fraudResult.triggeredRules,
       });
@@ -104,6 +105,9 @@ const getTransactionsService = async (userId) => {
       userId,
     },
     orderBy: { timestamp: "desc" },
+    include: {
+      fraudAlert: true,
+    },
   });
 
   return transactions;

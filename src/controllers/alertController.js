@@ -28,7 +28,8 @@ const getAlertsById = async (req, res) => {
 const reviewAlert = async (req, res) => {
   const id = req.params.id;
   const userId = req.user.userId;
-  const alert = await reviewAlertService(id, userId);
+  const { outcome, reviewNotes } = req.body;
+  const alert = await reviewAlertService(id, userId, outcome, reviewNotes);
   res.status(200).json({
     message: "Alert reviewed successfully",
     alert,

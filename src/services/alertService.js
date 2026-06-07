@@ -45,7 +45,7 @@ const getAlertsByIdService = async (id, userId) => {
   return alert;
 }
 
-const reviewAlertService = async (id, userId) => {
+const reviewAlertService = async (id, userId, outcome, reviewNotes) => {
   const alert = await prisma.fraudAlert.findUnique({
     where: { id },
     include: { transaction: true }
@@ -70,7 +70,7 @@ const reviewAlertService = async (id, userId) => {
     }),
     prisma.fraudAlert.update({
       where: { id },
-      data: { reviewed: true }
+      data: { reviewed: true, outcome, reviewNotes }
     })
   ]);
 

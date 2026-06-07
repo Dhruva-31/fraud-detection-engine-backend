@@ -3,73 +3,174 @@ const prisma = require("../config/prisma");
 const AppError = require("../utils/AppError");
 
 const getSummaryService = async (userId) => {
-  const result = await prisma.transaction.groupBy({
-    by: ["status"],
-    where: {
-      userId,
-    },
-    _count: {
-      status: true,
-    },
-  });
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-  const summary = { clean: 0, review: 0, flagged: 0, total: 0 };
+  const [
+    totalTransactions,
+    avgRiskScore,
+    totalAlerts,
+    reviewedAlerts,
+    fraudCount,
+    falsePositiveCount,
+  ] = await Promise.all([
+    prisma.transaction.count({
+      where: {
+        userId,
+        timestamp: {
+          gte: oneWeekAgo,
+        },
+      },
+    }),
 
-  result.forEach((item) => {
-    const key = item.status.toLowerCase();
-    summary[key] = item._count.status;
-    summary.total += item._count.status;
-  });
+    prisma.transaction.aggregate({
+      where: {
+        userId,
+        timestamp: {
+          gte: oneWeekAgo,
+        },
+      },
+      _avg: {
+        riskScore: true,
+      },
+    }),
 
-  return summary;
+    prisma.fraudAlert.count({
+      where: {
+        createdAt: {
+          gte: oneWeekAgo,
+        },
+        transaction: {
+          userId,
+        },
+      },
+    }),
+
+    prisma.fraudAlert.count({
+      where: {
+        reviewed: true,
+        createdAt: {
+          gte: oneWeekAgo,
+        },
+        transaction: {
+          userId,
+        },
+      },
+    }),
+
+    prisma.fraudAlert.count({
+      where: {
+        outcome: "FRAUD",
+        createdAt: {
+          gte: oneWeekAgo,
+        },
+        transaction: {
+          userId,
+        },
+      },
+    }),
+
+    prisma.fraudAlert.count({
+      where: {
+        outcome: "FALSE_POSITIVE",
+        createdAt: {
+          gte: oneWeekAgo,
+        },
+        transaction: {
+          userId,
+        },
+      },
+    }),
+  ]);
+
+  const falsePositiveRate =
+    reviewedAlerts === 0
+      ? 0
+      : Number(
+          ((falsePositiveCount / reviewedAlerts) * 100).toFixed(1)
+        );
+
+  return {
+    totalTransactions,
+    totalAlerts,
+    reviewedAlerts,
+    fraud: fraudCount,
+    falsePositives: falsePositiveCount,
+    falsePositiveRate,
+    avgRiskScore: Number(avgRiskScore._avg.riskScore || 0).toFixed(1),
+  };
 };
 
 const getRuleBreakdownService = async (userId) => {
-  const alerts = await prisma.fraudAlert.findMany({
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+  const transactions = await prisma.transaction.findMany({
     where: {
-      transaction: { userId },
+      userId,
+      timestamp: {
+        gte: oneWeekAgo,
+      },
+      fraudAlert: {
+        isNot: null,
+      },
     },
     select: {
       triggeredRules: true,
     },
   });
 
-  if (alerts.length === 0) {
-    return [];
-  }
-
   const ruleCount = {};
 
-  alerts.forEach((alert) => {
-    alert.triggeredRules.split(",").forEach((rule) => {
-      const trimmed = rule.trim();
-      ruleCount[trimmed] = (ruleCount[trimmed] || 0) + 1;
+  transactions.forEach((tx) => {
+    tx.triggeredRules.forEach((rule) => {
+      ruleCount[rule] = (ruleCount[rule] || 0) + 1;
     });
   });
 
-  const breakdown = Object.entries(ruleCount)
+  return Object.entries(ruleCount)
     .map(([rule, count]) => ({ rule, count }))
     .sort((a, b) => b.count - a.count);
-
-  return breakdown;
 };
 
 const getWeeklyService = async (userId) => {
   const result = await prisma.$queryRaw`
-    select date(timestamp) as date, 
-    count(*)::int as count 
-    from "Transaction"
-    where "userId" = ${userId} 
-    and timestamp >= now() - INTERVAl '7 days'
-    group by date(timestamp)
-    order by date asc
+    SELECT
+      DATE(timestamp) as date,
+      COUNT(*)::int as count
+    FROM "Transaction"
+    WHERE "userId" = ${userId}
+      AND timestamp >= NOW() - INTERVAL '7 days'
+    GROUP BY DATE(timestamp)
+    ORDER BY DATE(timestamp)
   `;
 
-  return result;
+  const map = {};
+
+  result.forEach((item) => {
+    const key = new Date(item.date).toISOString().split("T")[0];
+    map[key] = item.count;
+  });
+
+  const weekly = [];
+
+  for (let i = 6; i >= 0; i--) {
+    const day = new Date();
+    day.setDate(day.getDate() - i);
+
+    const key = day.toISOString().split("T")[0];
+
+    weekly.push({
+      date: key,
+      count: map[key] || 0,
+    });
+  }
+
+  return weekly;
 };
 
 module.exports = {
   getSummaryService,
   getRuleBreakdownService,
-  getWeeklyService
+  getWeeklyService,
 };
