@@ -4,79 +4,107 @@ const bcrypt = require("bcryptjs");
 const AppError = require("../utils/AppError");
 
 const registerService = async (name, email, password) => {
-
   if (!name || !email || !password) {
-      throw new AppError("name, email and password are required", 400);
-    }
+    throw new AppError("name, email and password are required", 400);
+  }
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (existingUser) {
+    throw new AppError("User with this email already exists", 409);
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  const user = await prisma.$transaction(async (tx) => {
+    const newUser = await tx.user.create({
+      data: { name, email, passwordHash },
     });
 
-    if (existingUser) {
-      throw new AppError("User with this email already exists", 409);
-    }
-
-    // Hash the password — 10 salt rounds
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // Create user + behavior profile in one transaction
-    const user = await prisma.$transaction(async (tx) => {
-      const newUser = await tx.user.create({
-        data: { name, email, passwordHash }
-      });
-
-      // Create an empty behavior profile for the user
-      await tx.userBehaviorProfile.create({
-        data: { userId: newUser.id }
-      });
-
-      return newUser;
+    await tx.userBehaviorProfile.create({
+      data: { userId: newUser.id },
     });
 
-    // Generate JWT
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    return newUser;
+  });
 
-    return { user, token }  
-}
+  const access_token = jwt.sign(
+    { userId: user.id, email: user.email },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" },
+  );
+
+  const refresh_token = jwt.sign(
+    { userId: user.id },
+    process.env.REFRESH_TOKEN_SECRET,
+    { expiresIn: "7d" },
+  );
+
+  return { user, access_token, refresh_token };
+};
 
 const loginService = async (email, password) => {
   if (!email || !password) {
-      throw new AppError("Email and password are required", 400);
+    throw new AppError("Email and password are required", 400);
   }
 
-  // Find user
   const existingUser = await prisma.user.findUnique({
-    where: { email }
+    where: { email },
   });
 
   if (!existingUser) {
     throw new AppError("Invalid credentials", 401);
   }
 
-  // Compare password with hash
-  const isPasswordValid = await bcrypt.compare(password, existingUser.passwordHash);
+  const isPasswordValid = await bcrypt.compare(
+    password,
+    existingUser.passwordHash,
+  );
 
   if (!isPasswordValid) {
     throw new AppError("Invalid credentials", 401);
   }
 
-  // Generate JWT
-  const token = jwt.sign(
+  const access_token = jwt.sign(
     { userId: existingUser.id, email: existingUser.email },
     process.env.JWT_SECRET,
-    { expiresIn: "7d" }
+    { expiresIn: "15m" },
+  );
+
+  const refresh_token = jwt.sign(
+    { userId: existingUser.id },
+    process.env.REFRESH_TOKEN_SECRET,
+    { expiresIn: "7d" },
   );
 
   const { hashed_password, ...user } = existingUser;
 
-  return { user, token };
-}
+  return { user, access_token, refresh_token };
+};
+
+const refreshService = async (refresh_token) => {
+  if (!refresh_token) {
+    throw new AppError("No refresh token provided", 401);
+  }
+
+  const decoded = jwt.verify(refresh_token, process.env.REFRESH_TOKEN_SECRET);
+
+  const new_access_token = jwt.sign(
+    { userId: decoded.userId, email: decoded.email },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" },
+  );
+
+  const new_refresh_token = jwt.sign(
+    { userId: decoded.userId },
+    process.env.REFRESH_TOKEN_SECRET,
+    { expiresIn: "7d" },
+  );
+
+  return { new_access_token, new_refresh_token };
+};
 
 const getMeService = async (id) => {
   const user = await prisma.user.findUnique({
@@ -85,13 +113,14 @@ const getMeService = async (id) => {
       id: true,
       name: true,
       email: true,
-      createdAt: true
-    }
+      createdAt: true,
+    },
   });
   return user;
-}
+};
 module.exports = {
   registerService,
   loginService,
-  getMeService
-}
+  refreshService,
+  getMeService,
+};

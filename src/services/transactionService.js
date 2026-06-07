@@ -62,12 +62,10 @@ const saveTransactionService = async (transactionData, io) => {
 const updateBehaviorProfile = async (userId, transaction) => {
   const { amount, category, location } = transaction;
 
-  // Step 1 — get current profile
   const profile = await prisma.userBehaviorProfile.findUnique({
     where: { userId },
   });
 
-  // Step 2 — recalculate average transaction amount
   const avgResult = await prisma.transaction.aggregate({
     where: { userId },
     _avg: { amount: true },
@@ -75,7 +73,6 @@ const updateBehaviorProfile = async (userId, transaction) => {
 
   const newAvg = avgResult._avg.amount || amount;
 
-  // Step 3 — update commonCategories
   const existingCategories = profile.commonCategories
     ? profile.commonCategories.split(",").map((c) => c.trim().toLowerCase())
     : [];
@@ -88,7 +85,6 @@ const updateBehaviorProfile = async (userId, transaction) => {
 
   const updatedCategories = existingCategories.join(",");
 
-  // Step 4 — save everything back
   await prisma.userBehaviorProfile.update({
     where: { userId },
     data: {
