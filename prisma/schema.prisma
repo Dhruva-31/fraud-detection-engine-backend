@@ -18,26 +18,35 @@ model User {
 }
 
 model Transaction {
-  id         String      @id @default(uuid())
-  userId     String
-  amount     Float
-  merchant   String
-  category   String
-  location   String
-  timestamp  DateTime    @default(now())
-  status     TxStatus    @default(CLEAN)
-  fraudAlert FraudAlert?
-  user       User        @relation(fields: [userId], references: [id])
+  id             String      @id @default(uuid())
+  userId         String
+  amount         Float
+  merchant       String
+  category       String
+  location       String
+  timestamp      DateTime    @default(now())
+
+  status         TxStatus    @default(CLEAN)
+
+  riskScore      Int         @default(0)
+  triggeredRules String[]
+
+  fraudAlert     FraudAlert?
+  user           User        @relation(fields: [userId], references: [id])
 }
 
 model FraudAlert {
-  id              String                  @id @default(uuid())
+  id             String         @id @default(uuid())
   transactionId  String         @unique
-  riskScore      Int
-  triggeredRules String
-  createdAt      DateTime    @default(now())
-  reviewed       Boolean     @default(false)
-  transaction    Transaction @relation(fields: [transactionId], references: [id])
+
+  createdAt      DateTime       @default(now())
+
+  reviewed       Boolean        @default(false)
+  outcome        ReviewOutcome?
+
+  reviewNotes    String?
+
+  transaction    Transaction    @relation(fields: [transactionId], references: [id])
 }
 
 model UserBehaviorProfile {
@@ -55,4 +64,9 @@ enum TxStatus {
   CLEAN
   REVIEW
   FLAGGED
+}
+
+enum ReviewOutcome {
+  FRAUD
+  FALSE_POSITIVE
 }

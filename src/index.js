@@ -4,7 +4,10 @@ const http = require("http");
 const { Server } = require("socket.io");
 require("dotenv").config();
 
-const { globalErrorHandler, notFoundHandler } = require("./middleware/errorMiddleware");
+const {
+  globalErrorHandler,
+  notFoundHandler,
+} = require("./middleware/errorMiddleware");
 
 const authRoutes = require("./routes/authRoute");
 const transactionRoutes = require("./routes/transactionRoute");
@@ -20,8 +23,8 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "http://localhost:3000",
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST"],
+  },
 });
 
 // Middlewares
@@ -45,8 +48,8 @@ app.use(globalErrorHandler);
 // Socket connection
 io.on("connection", (socket) => {
   logger.info(`Client connected: ${socket.id}`);
-  socket.on("disconnect", () => {
-    logger.info(`Client disconnected: ${socket.id}`);
+  socket.on("join_room", (data) => {
+    socket.join(`user_${data.userId}`);
   });
 });
 
@@ -55,10 +58,10 @@ server.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
 });
 
-app.get('/', (req, res) => {
+app.get("/", (req, res) => {
   res.json({
     success: true,
-    message: 'Server is running',
-    timestamp: new Date().toISOString()
+    message: "Server is running",
+    timestamp: new Date().toISOString(),
   });
 });
