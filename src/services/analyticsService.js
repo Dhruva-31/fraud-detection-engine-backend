@@ -86,9 +86,7 @@ const getSummaryService = async (userId) => {
   const falsePositiveRate =
     reviewedAlerts === 0
       ? 0
-      : Number(
-          ((falsePositiveCount / reviewedAlerts) * 100).toFixed(1)
-        );
+      : Number(((falsePositiveCount / reviewedAlerts) * 100).toFixed(1));
 
   return {
     totalTransactions,
@@ -123,7 +121,9 @@ const getRuleBreakdownService = async (userId) => {
   const ruleCount = {};
 
   transactions.forEach((tx) => {
-    tx.triggeredRules.forEach((rule) => {
+    if (!tx.triggeredRules) return;
+    tx.triggeredRules.forEach((trigger) => {
+      const rule = trigger.rule;
       ruleCount[rule] = (ruleCount[rule] || 0) + 1;
     });
   });

@@ -8,7 +8,7 @@ datasource db {
 }
 
 model User {
-  id              String                  @id @default(uuid())
+  id              String               @id @default(uuid())
   name            String
   email           String               @unique
   passwordHash    String
@@ -18,43 +18,46 @@ model User {
 }
 
 model Transaction {
-  id             String      @id @default(uuid())
-  userId         String
-  amount         Float
-  merchant       String
-  category       String
-  location       String
-  timestamp      DateTime    @default(now())
+  id        String   @id @default(uuid())
+  userId    String
+  amount    Float
+  merchant  String
+  category  String
+  latitude  Float
+  longitude Float
+  location  String
+  timestamp DateTime @default(now())
 
-  status         TxStatus    @default(CLEAN)
+  status TxStatus @default(CLEAN)
 
-  riskScore      Int         @default(0)
-  triggeredRules String[]
+  riskScore      Int   @default(0)
+  triggeredRules Json?
 
-  fraudAlert     FraudAlert?
-  user           User        @relation(fields: [userId], references: [id])
+  fraudAlert FraudAlert?
+  user       User        @relation(fields: [userId], references: [id])
 }
 
 model FraudAlert {
-  id             String         @id @default(uuid())
-  transactionId  String         @unique
+  id            String @id @default(uuid())
+  transactionId String @unique
 
-  createdAt      DateTime       @default(now())
+  createdAt DateTime @default(now())
 
-  reviewed       Boolean        @default(false)
-  outcome        ReviewOutcome?
+  reviewed Boolean        @default(false)
+  outcome  ReviewOutcome?
 
-  reviewNotes    String?
+  reviewNotes String?
 
-  transaction    Transaction    @relation(fields: [transactionId], references: [id])
+  transaction Transaction @relation(fields: [transactionId], references: [id])
 }
 
 model UserBehaviorProfile {
-  id              String                  @id @default(uuid())
-  userId               String      @unique
+  id                   String   @id @default(uuid())
+  userId               String   @unique
   avgTransactionAmount Float    @default(0)
+  transactionStdDev    Float    @default(0)
   commonCategories     String   @default("")
-  activeHours          String   @default("8-22")
+  activeHours          String   @default("")
   lastKnownLocation    String?
   updatedAt            DateTime @updatedAt
   user                 User     @relation(fields: [userId], references: [id])
