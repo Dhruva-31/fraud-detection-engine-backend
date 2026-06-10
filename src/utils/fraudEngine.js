@@ -1,4 +1,5 @@
 const prisma = require("../config/prisma");
+const { getDistance } = require("geolib");
 
 const velocityCheck = async (id) => {
   // 3 transactions in last 60 secs
@@ -6,9 +7,9 @@ const velocityCheck = async (id) => {
     where: {
       userId: id,
       timestamp: {
-        gte: new Date(Date.now() - 60 * 1000)
-      }
-    }
+        gte: new Date(Date.now() - 60 * 1000),
+      },
+    },
   });
 
   if (count > 3) {
@@ -19,27 +20,64 @@ const velocityCheck = async (id) => {
 };
 
 const amountAnomaly = async (amount, userId) => {
-  // transaction amount > 3 times average amount
-  const user = await prisma.userBehaviorProfile.findUnique({
+  const profile = await prisma.userBehaviorProfile.findUnique({
     where: { userId },
-    select: { avgTransactionAmount: true }
+    select: {
+      avgTransactionAmount: true,
+      transactionStdDev: true,
+    },
   });
 
-  if (!user || user.avgTransactionAmount === 0) return null;
+  if (
+    !profile ||
+    profile.avgTransactionAmount === 0 ||
+    profile.transactionStdDev === 0
+  ) {
+    return null;
+  }
 
-  if (amount > 3 * user.avgTransactionAmount) {
-    return { points: 30, anomaly: "AMOUNT_ANOMALY" };
+  const zScore = Math.abs(
+    (amount - profile.avgTransactionAmount) / profile.transactionStdDev,
+  );
+
+  if (zScore > 5) {
+    return {
+      points: 50,
+      anomaly: "AMOUNT_ANOMALY",
+    };
+  }
+
+  if (zScore > 3) {
+    return {
+      points: 30,
+      anomaly: "AMOUNT_ANOMALY",
+    };
   }
 
   return null;
 };
 
-const oddHour = () => {
-  // transaction in midnyt
-  const hour = new Date().getHours();
+const oddHour = async (userId) => {
+  const profile = await prisma.userBehaviorProfile.findUnique({
+    where: { userId },
+    select: {
+      activeHours: true,
+    },
+  });
 
-  if (hour >= 1 && hour <= 4) {
-    return { points: 15, anomaly: "ODD_HOUR" };
+  if (!profile?.activeHours) {
+    return null;
+  }
+
+  const currentHour = new Date().getHours();
+
+  const [start, end] = profile.activeHours.split("-").map(Number);
+
+  if (currentHour < start || currentHour > end) {
+    return {
+      points: 20,
+      anomaly: "ODD_HOUR",
+    };
   }
 
   return null;
@@ -49,7 +87,7 @@ const newCategory = async (category, id) => {
   // new category of transaction - shopping, etc
   const user = await prisma.userBehaviorProfile.findUnique({
     where: { userId: id },
-    select: { commonCategories: true }
+    select: { commonCategories: true },
   });
 
   if (!user || !user.commonCategories) return null;
@@ -59,37 +97,87 @@ const newCategory = async (category, id) => {
     .map((c) => c.trim().toLowerCase());
 
   if (!categoriesArray.includes(category.toLowerCase())) {
-    return { points: 20, anomaly: "NEW_CATEGORY" };
+    return { points: 15, anomaly: "NEW_CATEGORY" };
   }
 
   return null;
 };
 
-const impossibleTravel = async (id, location) => {
-  // location of transaction 30 mins before doesnt match the current transaction location
-  const recentTransaction = await prisma.transaction.findFirst({
+const impossibleTravel = async (current) => {
+  // location of last transaction
+  const prev = await prisma.transaction.findFirst({
     where: {
-      userId: id,
+      userId: current.userId,
       timestamp: {
-        gte: new Date(Date.now() - 30 * 60 * 1000)
-      }
+        lt: current.timestamp,
+      },
     },
-    orderBy: { timestamp: "desc" }
+    orderBy: { timestamp: "desc" },
   });
 
-  if (
-    recentTransaction &&
-    recentTransaction.location.toLowerCase() !== location.toLowerCase()
-  ) {
-    return { points: 60, anomaly: "IMPOSSIBLE_TRAVEL" };
+  if (!prev) {
+    return null;
+  }
+
+  const distanceMeters = getDistance(
+    {
+      latitude: prev.latitude,
+      longitude: prev.longitude,
+    },
+    {
+      latitude: current.latitude,
+      longitude: current.longitude,
+    },
+  );
+
+  const distanceKm = distanceMeters / 1000;
+
+  const currentTime = current.timestamp || new Date();
+
+  const hoursElapsed = (currentTime - prev.timestamp) / (1000 * 60 * 60);
+  if (hoursElapsed <= 0) {
+    return null;
+  }
+
+  const speed = distanceKm / hoursElapsed;
+
+  if (speed > 2000) {
+    return {
+      points: 60,
+      anomaly: "IMPOSSIBLE_TRAVEL",
+    };
+  } else if (speed > 900) {
+    return {
+      points: 40,
+      anomaly: "IMPOSSIBLE_TRAVEL",
+    };
+  } else if (speed > 500) {
+    return {
+      points: 20,
+      anomaly: "IMPOSSIBLE_TRAVEL",
+    };
   }
 
   return null;
 };
 
-const roundAmount = (amount) => {
-  if (amount % 1 === 0 && amount % 10 === 0) {
-    return { points: 10, anomaly: "ROUND_AMOUNT" };
+const locationAnomaly = async (location, userId) => {
+  const profile = await prisma.userBehaviorProfile.findUnique({
+    where: { userId },
+    select: {
+      lastKnownLocation: true,
+    },
+  });
+
+  if (!profile?.lastKnownLocation) {
+    return null;
+  }
+
+  if (profile.lastKnownLocation.toLowerCase() !== location.toLowerCase()) {
+    return {
+      points: 15,
+      anomaly: "LOCATION_ANOMALY",
+    };
   }
 
   return null;
@@ -101,22 +189,25 @@ const runFraudEngine = async (transaction) => {
   const results = await Promise.all([
     velocityCheck(userId),
     amountAnomaly(amount, userId),
-    Promise.resolve(oddHour()),          
+    oddHour(userId),
     newCategory(category, userId),
-    impossibleTravel(userId, location),
-    Promise.resolve(roundAmount(amount))  
+    impossibleTravel(transaction),
+    locationAnomaly(location, userId),
   ]);
 
   const triggered = results.filter((result) => result !== null);
 
   const riskScore = triggered.reduce((sum, result) => sum + result.points, 0);
 
-  const triggeredRules = triggered.map((result) => result.anomaly);
+  const triggeredRules = triggered.map((result) => ({
+    rule: result.anomaly,
+    points: result.points,
+  }));
 
   let status;
-  if (riskScore <= 30) {
+  if (riskScore <= 39) {
     status = "CLEAN";
-  } else if (riskScore <= 59) {
+  } else if (riskScore <= 79) {
     status = "REVIEW";
   } else {
     status = "FLAGGED";
