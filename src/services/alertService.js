@@ -1,7 +1,7 @@
 const logger = require("../config/logger");
 const prisma = require("../config/prisma");
 const AppError = require("../utils/AppError");
-const { updateBehaviorProfile } = require("./transactionService");
+const { updateBehaviorProfile } = require("./behaviourService");
 
 const getAllAlertsService = async (userId, query) => {
   const where = {
