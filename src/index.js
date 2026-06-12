@@ -13,6 +13,7 @@ const authRoutes = require("./routes/authRoute");
 const transactionRoutes = require("./routes/transactionRoute");
 const alertRoutes = require("./routes/alertRoute");
 const analyticsRoutes = require("./routes/analyticsRoute");
+const behaviourRoutes = require("./routes/behaviourRoute");
 
 const requestLogger = require("./middleware/requestLoggerMiddleware");
 const logger = require("./config/logger");
@@ -53,6 +54,7 @@ app.use(authRoutes);
 app.use(transactionRoutes);
 app.use(alertRoutes);
 app.use(analyticsRoutes);
+app.use(behaviourRoutes);
 
 app.use(notFoundHandler);
 app.use(globalErrorHandler);
